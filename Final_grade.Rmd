@@ -1,0 +1,99 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Leão Pereira"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+library(caret)
+library(randomForest)
+library(rpart)
+library(rpart.plot)
+library(ggplot2)
+library(dplyr)
+```
+
+## Introduction
+
+This report describes the steps taken to predict the manner in which participants performed barbell lifts. The data was collected via accelerometers placed on different parts of the body. The target variable is `classe`, which represents the correct or incorrect execution type. We perform data cleaning, exploratory data analysis, feature selection, model building using Random Forest, cross-validation, and final predictions.
+
+## Data Loading
+
+```{r load-data}
+train_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+test_url <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+
+training <- read.csv(train_url, na.strings = c("NA", "#DIV/0!", ""))
+testing <- read.csv(test_url, na.strings = c("NA", "#DIV/0!", ""))
+```
+
+## Data Preprocessing
+
+```{r clean-data}
+# Remove near-zero variance predictors
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+
+# Remove columns with mostly NA values
+training <- training[, colMeans(!is.na(training)) > 0.95]
+
+# Remove irrelevant columns (first 5 columns are IDs and timestamps)
+training <- training[, -(1:5)]
+testing <- testing[, colnames(testing) %in% colnames(training)]
+```
+
+## Data Partition
+
+```{r split-data}
+set.seed(1234)
+inTrain <- createDataPartition(y = training$classe, p = 0.7, list = FALSE)
+train_set <- training[inTrain, ]
+valid_set <- training[-inTrain, ]
+```
+
+## Model Training - Random Forest
+
+```{r rf-model}
+set.seed(1234)
+rf_model <- train(classe ~ ., data = train_set, method = "rf", trControl = trainControl(method = "cv", number = 5))
+rf_model
+```
+
+## Model Evaluation
+
+```{r eval-model}
+valid_set$classe <- factor(valid_set$classe)
+pred_rf <- predict(rf_model, valid_set)
+pred_rf <- factor(pred_rf, levels = levels(valid_set$classe))
+confusionMatrix(pred_rf, valid_set$classe)
+```
+
+## Final Predictions on Test Set
+
+```{r final-predictions}
+final_predictions <- predict(rf_model, testing)
+final_predictions
+```
+
+## Conclusion
+
+Random Forest provided a highly accurate model, with cross-validation used to estimate the out-of-sample error. This model was then applied to the 20 test cases.
+
+## Appendix: Prediction Output Writer
+
+```{r prediction-writer, eval=FALSE}
+# Function to write individual files (if needed for quiz submission)
+write_predictions <- function(predictions) {
+  for(i in 1:length(predictions)) {
+    filename <- paste0("problem_id_", i, ".txt")
+    write.table(predictions[i], file=filename, quote=FALSE, row.names=FALSE, col.names=FALSE)
+  }
+}
+# write_predictions(final_predictions)
+```
+
+---
+
+*Source: [Weight Lifting Dataset](http://groupware.les.inf.puc-rio.br/har)*
