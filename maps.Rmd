@@ -1,0 +1,47 @@
+---
+title: "Mapa Interativo com Leaflet e Ícones Customizados"
+author: "Leão Pereira"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    self_contained: true
+---
+
+```{r leaflet-mapa, echo=FALSE}
+library(leaflet)
+
+# Recriar ícones
+palmeira_icon <- makeIcon(
+  iconUrl = "https://cdn-icons-png.flaticon.com/512/4272/4272796.png",
+  iconWidth = 30, iconHeight = 30,
+  iconAnchorX = 15, iconAnchorY = 30
+)
+
+mapa_icon <- makeIcon(
+  iconUrl = "https://cdn-icons-png.flaticon.com/512/684/684908.png",
+  iconWidth = 30, iconHeight = 30,
+  iconAnchorX = 15, iconAnchorY = 30
+)
+
+leaflet() %>%
+  addProviderTiles(providers$CartoDB.Positron, group = "Carto Light") %>%
+  setView(lng = -50, lat = -15, zoom = 4) %>%
+  addMarkers(
+    lng = -46.6333, lat = -23.5505,
+    popup = "<b>São Paulo</b><br>Centro financeiro",
+    icon = palmeira_icon,
+    group = "Capitais"
+  ) %>%
+  addMarkers(
+    lng = -43.1964, lat = -22.9083,
+    popup = "<b>Rio de Janeiro</b><br>Cidade Maravilhosa",
+    icon = mapa_icon,
+    group = "Capitais"
+  ) %>%
+  addLayersControl(
+    baseGroups = c("Carto Light"),
+    overlayGroups = c("Capitais"),
+    options = layersControlOptions(collapsed = FALSE)
+  )
+
+```
