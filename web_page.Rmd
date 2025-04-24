@@ -1,0 +1,35 @@
+---
+title: "R Markdown Presentation & Plotly"
+author: "Leão Pereira"
+date: "`r Sys.Date()`"
+output: 
+  ioslides_presentation:
+    self_contained: true
+---
+
+## Welcome
+
+This presentation was created as part of a course assignment. It uses **Plotly** to display interactive data visualizations in a web presentation format using **R Markdown**.
+
+---
+
+## The Dataset
+
+We’ll use the classic `mtcars` dataset that contains fuel consumption and 10 aspects of automobile design and performance.
+
+```{r, echo=FALSE}
+library(dplyr)
+library(plotly)
+data <- mtcars %>% tibble::rownames_to_column("model")
+
+plot_ly(data = data, 
+        x = ~wt, 
+        y = ~mpg, 
+        type = 'scatter', 
+        mode = 'markers',
+        text = ~model,
+        marker = list(size = 10, color = 'blue')) %>%
+  layout(title = "Fuel Efficiency vs Car Weight",
+         xaxis = list(title = "Weight (wt)"),
+         yaxis = list(title = "Miles per Gallon (mpg)"))
+```
