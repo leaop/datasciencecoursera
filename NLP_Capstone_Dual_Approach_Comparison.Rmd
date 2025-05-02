@@ -1,0 +1,151 @@
+
+---
+title: "NLP Capstone: Exploratory vs Predictive Modeling (N-gram)"
+author: "Leão Pereira"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+library(tidytext)
+library(stringr)
+library(ggplot2)
+library(gridExtra)
+```
+
+# Introduction
+
+In this document, we compare two approaches to handling n-grams in a Natural Language Processing task:
+
+- **Exploratory frequency-based analysis** of n-grams
+- **Predictive modeling using backoff strategy** based on n-gram context
+
+All analysis is based on a sampled portion of the Twitter dataset: `"final/en_US/en_US.twitter.txt"`.
+
+---
+
+# 1. Load and Sample the Data
+
+```{r load-data}
+# Load Twitter sample
+set.seed(123)
+file_path <- "final/en_US/en_US.twitter.txt"
+lines <- readLines(file_path, encoding = "UTF-8", skipNul = TRUE)
+sample_lines <- sample(lines, size = 10000)
+text_df <- tibble(line = 1:length(sample_lines), text = sample_lines)
+```
+
+---
+
+# 2. Exploratory Analysis: Top N-Grams
+
+## 2.1 Bigram Frequency
+
+```{r explore-bigrams}
+bigrams <- text_df %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2)
+
+bigram_freq <- bigrams %>%
+  count(bigram, sort = TRUE)
+
+bigram_freq %>% head(10)
+```
+
+```{r plot-bigrams}
+bigram_freq %>%
+  slice_max(n, n = 20) %>%
+  ggplot(aes(x = reorder(bigram, n), y = n)) +
+  geom_col(fill = "darkorange") +
+  coord_flip() +
+  labs(title = "Top 20 Bigrams (Exploratory)", x = "Bigram", y = "Frequency")
+```
+
+## 2.2 Trigram Frequency
+
+```{r explore-trigrams}
+trigrams <- text_df %>%
+  unnest_tokens(trigram, text, token = "ngrams", n = 3)
+
+trigram_freq <- trigrams %>%
+  count(trigram, sort = TRUE)
+
+trigram_freq %>% head(10)
+```
+
+---
+
+# 3. Predictive Modeling with Backoff Strategy
+
+In this section, we convert n-gram frequency tables into predictive lookup models with fallback from trigram → bigram → unigram.
+
+```{r build-models}
+# Unigrams
+tokens <- text_df %>%
+  unnest_tokens(word, text) %>%
+  filter(str_detect(word, "^[a-z']+$"))
+
+unigram_model <- tokens %>%
+  count(word, sort = TRUE)
+
+# Bigrams with context
+bigram_model <- text_df %>%
+  unnest_tokens(bigram, text, token = "ngrams", n = 2) %>%
+  count(bigram, sort = TRUE) %>%
+  separate(bigram, into = c("w1", "w2"), sep = " ") %>%
+  group_by(w1) %>%
+  slice_max(n, n = 5) %>%
+  ungroup()
+
+# Trigrams with context
+trigram_model <- text_df %>%
+  unnest_tokens(trigram, text, token = "ngrams", n = 3) %>%
+  count(trigram, sort = TRUE) %>%
+  separate(trigram, into = c("w1", "w2", "w3"), sep = " ") %>%
+  group_by(w1, w2) %>%
+  slice_max(n, n = 3) %>%
+  ungroup()
+```
+
+```{r predict-function}
+predict_next_word <- function(input_text) {
+  words <- tolower(str_split(input_text, " ")[[1]])
+  len <- length(words)
+
+  if (len >= 2) {
+    pred <- trigram_model %>%
+      filter(w1 == words[len - 1], w2 == words[len]) %>%
+      arrange(desc(n)) %>%
+      pull(w3)
+    if (length(pred) > 0) return(pred[1])
+  }
+
+  if (len >= 1) {
+    pred <- bigram_model %>%
+      filter(w1 == words[len]) %>%
+      arrange(desc(n)) %>%
+      pull(w2)
+    if (length(pred) > 0) return(pred[1])
+  }
+
+  return(unigram_model$word[1])
+}
+```
+
+## Example Predictions
+
+```{r prediction-examples}
+cat("Input: I love →", predict_next_word("I love"), "\n")
+cat("Input: How are →", predict_next_word("How are"), "\n")
+cat("Input: Thanks for →", predict_next_word("Thanks for"), "\n")
+```
+
+---
+
+# 4. Conclusion
+
+This document compares two approaches:
+- The **exploratory analysis** helps understand the structure and frequency of natural text.
+- The **backoff model** transforms this structure into a usable algorithm that mimics how predictive text works in practice.
+
+Next steps include packaging this prediction into a Shiny interface.
